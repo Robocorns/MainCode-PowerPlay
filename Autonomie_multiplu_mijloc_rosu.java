@@ -1,0 +1,304 @@
+package Autonomii.Andrei.Plictisit;
+
+//distance sensor
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
+//distance sensor
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.acmerobotics.dashboard.config.Config;
+import com.acmerobotics.roadrunner.followers.TrajectoryFollower;
+import com.acmerobotics.roadrunner.geometry.Pose2d;
+import com.acmerobotics.roadrunner.geometry.Vector2d;
+import com.acmerobotics.roadrunner.trajectory.Trajectory;
+
+
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.teamcode.drive.SampleMecanumDrive;
+import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequence;
+import org.openftc.apriltag.AprilTagDetection;
+import org.openftc.easyopencv.OpenCvCamera;
+import org.openftc.easyopencv.OpenCvCameraFactory;
+import org.openftc.easyopencv.OpenCvCameraRotation;
+import org.openftc.easyopencv.OpenCvInternalCamera;
+
+import java.util.ArrayList;
+import java.util.Vector;
+
+import Autonomii.AprilTagDetectionPipeline;
+import Autonomii.HardwareMapPowerPlay;
+@Disabled
+@Autonomous (name="Autonomie_Rosu_Mijloc_Multiplu", group = "#*")
+public class Autonomie_multiplu_mijloc_rosu extends LinearOpMode {
+    private FtcDashboard dashboard;
+    //distance sensor
+    HardwareMapPowerPlay robot = new HardwareMapPowerPlay();
+    OpenCvCamera camera;
+    AprilTagDetectionPipeline aprilTagDetectionPipeline;
+    static final double FEET_PER_METER = 3.28084;
+    double fx = 578.272;
+    double fy = 578.272;
+    double cx = 402.145;
+    double cy = 221.506;
+    // UNITS ARE METERS
+    double tagsize = 0.166;
+    int Left = 1;
+    int Mid = 2;
+    int Right = 3;
+    int Mijloc = 0, Stanga = 0, Dreapta = 0;
+    AprilTagDetection tagOfInterest = null;
+    double valoared, valoares;
+
+    @Override
+    public void runOpMode() throws InterruptedException {
+
+
+        //distance sensor
+        telemetry = new MultipleTelemetry(telemetry, dashboard.getInstance().getTelemetry());
+        SampleMecanumDrive drive = new SampleMecanumDrive(hardwareMap);
+        robot.initPP(hardwareMap);
+
+        int cameraMonitorViewId = hardwareMap.appContext.getResources().getIdentifier("cameraMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        camera = OpenCvCameraFactory.getInstance().createWebcam(hardwareMap.get(WebcamName.class, "Webcam 1"), cameraMonitorViewId);
+        aprilTagDetectionPipeline = new AprilTagDetectionPipeline(tagsize, fx, fy, cx, cy);
+        //   valoared =robot.dsensor.getDistance(DistanceUnit.CM);
+        //   valoares=robot.ssensor.getDistance(DistanceUnit.CM);
+
+
+        camera.setPipeline(aprilTagDetectionPipeline);
+
+        camera.openCameraDeviceAsync(new OpenCvCamera.AsyncCameraOpenListener() {
+            @Override
+            public void onOpened() {
+                camera.startStreaming(1280, 720, OpenCvCameraRotation.UPRIGHT);
+                telemetry.update();
+            }
+
+            @Override
+            public void onError(int errorCode) {
+
+            }
+        });
+
+        telemetry.setMsTransmissionInterval(50);
+
+        while (!isStarted() && !isStopRequested()) {
+            ArrayList<AprilTagDetection> currentDetections = aprilTagDetectionPipeline.getLatestDetections();
+            double val;
+            // val=robot.dsensor.getDistance(DistanceUnit.CM);
+
+            if (currentDetections.size() != 0) {
+                boolean tagFound = false;
+
+                for (AprilTagDetection tag : currentDetections) {
+                    if (tag.id == 1 || tag.id == 2 || tag.id == 3) {
+                        tagOfInterest = tag;
+                        tagFound = true;
+                        break;
+                    }
+                }
+
+                if (tagFound) {
+                    telemetry.addLine("Tag of interest is in sight!\n\nLocation data:");
+                    tagToTelemetry(tagOfInterest);
+                } else {
+                    telemetry.addLine("Don't see tag of interest :( ");
+
+                    if (tagOfInterest == null) {
+                        telemetry.addLine("(The tag has never been seen)");
+                    } else {
+                        telemetry.addLine("\nBut we HAVE seen the tag before; last seen at:");
+                        tagToTelemetry(tagOfInterest);
+                    }
+                }
+
+            } else {
+                telemetry.addLine("Don't see tag of interest :(");
+
+
+                if (tagOfInterest == null) {
+                    telemetry.addLine("(The tag has never been seen)");
+                } else {
+                    telemetry.addLine("\nBut we HAVE seen the tag before; last seen at:");
+                    tagToTelemetry(tagOfInterest);
+                }
+                if (tagOfInterest == null || tagOfInterest.id == Right) {
+                    Stanga = 0;
+                    Mijloc = 0;
+                    Dreapta = 1;
+                } else if (tagOfInterest == null || tagOfInterest.id == Left) {
+                    Stanga = 1;
+                    Mijloc = 0;
+                    Dreapta = 0;
+
+                } else if (tagOfInterest == null || tagOfInterest.id == Mid) {
+                    Stanga = 0;
+                    Mijloc = 1;
+                    Dreapta = 0;
+                }
+
+            }
+
+            telemetry.update();
+            pickCone();
+        }
+        if (tagOfInterest != null) {
+            telemetry.addLine("Tag snapshot:\n");
+            tagToTelemetry(tagOfInterest);
+            telemetry.update();
+        } else {
+            telemetry.addLine("No tag snapshot available, it was never sighted during the init loop :(");
+            telemetry.update();
+        }
+
+
+        TrajectorySequence stalpMij = drive.trajectorySequenceBuilder(new Pose2d())
+                .forward(27)//30
+                .addDisplacementMarker(2, () -> {
+                    Level();
+                })
+                .turn(Math.toRadians(-90))
+                .strafeLeft(15)
+                .forward(7)//10
+                .build();
+
+        TrajectorySequence conuri = drive.trajectorySequenceBuilder(stalpMij.end())
+                .back(7)//9
+                .strafeLeft(13)
+                .addDisplacementMarker(2, () -> {
+                    Stack0();
+                })
+                .turn(Math.toRadians(180))
+                .forward(26)
+                .build();
+
+        TrajectorySequence stalpMij2 = drive.trajectorySequenceBuilder(conuri.end())
+                .back(25)//26
+                .addDisplacementMarker(20,() ->
+                        {Level();}
+                )
+                .turn(Math.toRadians(-180))
+                .strafeRight(13)
+                .forward(6)
+                .build();
+        TrajectorySequence stalpMij3 = drive.trajectorySequenceBuilder(conuri.end())
+                .back(7)//26
+                .addDisplacementMarker(20,() ->
+                        {Stack0();}
+                )
+                .strafeLeft(13)
+                .turn(Math.toRadians(180))
+                .forward(26)
+                .build();
+
+        TrajectorySequence finish = drive.trajectorySequenceBuilder(stalpMij.end())
+                .back(8)
+                .strafeRight(14)
+                .build();
+        TrajectorySequence left = drive.trajectorySequenceBuilder(finish.end())
+                .back(23)
+                .build();
+        TrajectorySequence right = drive.trajectorySequenceBuilder(finish.end())
+                .forward(23)
+                .build();
+
+
+        waitForStart();
+        if (opModeIsActive() && !isStopRequested()) {
+            // TelementrySensor();
+
+            drive.followTrajectorySequence(stalpMij);
+            dropCone();
+            drive.followTrajectorySequence(conuri);
+            Stack5();
+            pickCone();
+            Stack0();
+            drive.followTrajectorySequence(stalpMij2);
+            dropCone();
+            drive.followTrajectorySequence(stalpMij3);
+            Stack4();
+            pickCone();
+            Stack0();
+            drive.followTrajectorySequence(stalpMij2);
+            dropCone();
+
+            drive.followTrajectorySequence(finish);
+            if (tagOfInterest.id==Left)
+                drive.followTrajectorySequence(left);
+            else if (tagOfInterest.id==Right)
+                drive.followTrajectorySequence(right);
+        }
+
+
+        if (isStopRequested())
+            return;
+
+    }
+
+    public void Level() {
+        telemetry.addLine("Ridicha scripeti mij");
+        telemetry.update();
+        robot.scripS.setTargetPosition(1500);
+        robot.scripS.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.scripS.setPower(0.75);
+    }
+
+//    public void Low() {
+//        robot.scripS.setTargetPosition(0);
+//        robot.scripS.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+//        robot.scripS.setPower(1);
+//    }
+    public void Stack5() {
+        robot.scripS.setTargetPosition(1050);
+        robot.scripS.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.scripS.setPower(1);
+    }
+    public void Stack4() {
+        robot.scripS.setTargetPosition(950);
+        robot.scripS.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.scripS.setPower(1);
+    }
+    public void Stack0() {
+        robot.scripS.setTargetPosition(1200);
+        robot.scripS.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        robot.scripS.setPower(1);
+    }
+
+
+    public void pickCone() {
+        telemetry.addLine("Pick Cone");
+        telemetry.update();
+        robot.gheara.setPosition(0.4);
+    }
+
+    public void dropCone() {
+        telemetry.addLine("Drop Cone");
+        telemetry.update();
+        robot.gheara.setPosition(0.8);
+
+    }
+
+
+    void tagToTelemetry(AprilTagDetection detection) {
+        telemetry.addLine(String.format("\nDetected tag ID=%d", detection.id));
+        telemetry.addLine(String.format("Translation X: %.2f feet", detection.pose.x * FEET_PER_METER));
+        telemetry.addLine(String.format("Translation Y: %.2f feet", detection.pose.y * FEET_PER_METER));
+        telemetry.addLine(String.format("Translation Z: %.2f feet", detection.pose.z * FEET_PER_METER));
+        telemetry.addLine(String.format("Rotation Yaw: %.2f degrees", Math.toDegrees(detection.pose.yaw)));
+        telemetry.addLine(String.format("Rotation Pitch: %.2f degrees", Math.toDegrees(detection.pose.pitch)));
+        telemetry.addLine(String.format("Rotation Roll: %.2f degrees", Math.toDegrees(detection.pose.roll)));
+        telemetry.addData("Tag id", tagOfInterest.id);
+    }
+ /*   void TelementrySensor()
+    {
+        telemetry.addData("Distanta Dreapta: ",robot.dsensor.getDistance(DistanceUnit.CM));
+        telemetry.addData("Distanta Sranga:",robot.ssensor.getDistance(DistanceUnit.CM));
+        telemetry.update();}*/
+
+}
